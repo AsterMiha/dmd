@@ -1277,7 +1277,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
             return ErrorExp.get();
         }
 
-        auto exps = udad ? udad.getAttributes() : new Expressions();
+        auto exps = udad ? getAttributes(udad) : new Expressions();
         auto tup = new TupleExp(e.loc, exps);
         return tup.expressionSemantic(sc);
     }

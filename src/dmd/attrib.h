@@ -248,7 +248,6 @@ public:
     Dsymbol *syntaxCopy(Dsymbol *s);
     Scope *newScope(Scope *sc);
     void setScope(Scope *sc);
-    Expressions *getAttributes();
     const char *kind() const;
     void accept(Visitor *v) { v->visit(this); }
 };

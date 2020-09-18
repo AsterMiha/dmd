@@ -769,7 +769,7 @@ extern(D) private:
         if (!fd.userAttribDecl)
             return 0;
 
-        auto udas = fd.userAttribDecl.getAttributes();
+        auto udas = getAttributes(fd.userAttribDecl);
         arrayExpressionSemantic(udas, sc, true);
 
         return udas.each!((uda) {
