@@ -31,7 +31,7 @@ import dmd.declaration;
 import dmd.dmodule;
 import dmd.dscope;
 import dmd.dsymbol;
-import dmd.dsymbolsem : dsymbolSemantic;
+import dmd.dsymbolsem : dsymbolSemantic, ScopeVisitor;
 import dmd.expression;
 import dmd.func;
 import dmd.globals;
@@ -120,6 +120,8 @@ extern (C++) abstract class AttribDeclaration : Dsymbol
         if (d)
         {
             Scope* sc2 = newScope(sc);
+            //ScopeVisitor v = new ScopeVisitor(sc, &sc2);
+            //v.visit(this);
             d.foreachDsymbol( s => s.addMember(sc2, sds) );
             if (sc2 != sc)
                 sc2.pop();
@@ -133,6 +135,8 @@ extern (C++) abstract class AttribDeclaration : Dsymbol
         if (d)
         {
             Scope* sc2 = newScope(sc);
+            //ScopeVisitor v = new ScopeVisitor(sc, &sc2);
+            //v.visit(this);
             d.foreachDsymbol( s => s.setScope(sc2) );
             if (sc2 != sc)
                 sc2.pop();
@@ -146,6 +150,8 @@ extern (C++) abstract class AttribDeclaration : Dsymbol
         if (d)
         {
             Scope* sc2 = newScope(sc);
+            //ScopeVisitor v = new ScopeVisitor(sc, &sc2);
+            //v.visit(this);
             d.foreachDsymbol( s => s.importAll(sc2) );
             if (sc2 != sc)
                 sc2.pop();
@@ -291,6 +297,8 @@ extern (C++) class StorageClassDeclaration : AttribDeclaration
         if (d)
         {
             Scope* sc2 = newScope(sc);
+            //ScopeVisitor v = new ScopeVisitor(sc, &sc2);
+            //v.visit(this);
 
             d.foreachDsymbol( (s)
             {

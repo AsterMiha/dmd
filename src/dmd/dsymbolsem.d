@@ -1787,6 +1787,8 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         if (d)
         {
             Scope* sc2 = ad.newScope(sc);
+            //ScopeVisitor v = new ScopeVisitor(sc, &sc2);
+            //ad.accept(v);
             bool errors;
             for (size_t i = 0; i < d.dim; i++)
             {
@@ -6670,5 +6672,201 @@ void aliasSemantic(AliasDeclaration ds, Scope* sc)
         ds.overnext = null;
         if (!ds.overloadInsert(sx))
             ScopeDsymbol.multiplyDefined(Loc.initial, sx, ds);
+    }
+}
+
+///
+final class ScopeVisitor : Visitor
+{
+    alias visit = Visitor.visit;
+
+    private Scope* sc;
+    public Scope** _scope;
+
+    this(Scope* sc, Scope** _scope)
+    {
+        this.sc = sc;
+        this._scope = _scope;
+    }
+
+    /****************************************
+    * Create a new scope if one or more given attributes
+    * are different from the sc's.
+    * If the returned scope != sc, the caller should pop
+    * the scope after it used.
+    */
+    private static Scope* createNewScope(Scope* sc, StorageClass stc, LINK linkage,
+        CPPMANGLE cppmangle, Prot protection, int explicitProtection,
+        AlignDeclaration aligndecl, PINLINE inlining)
+    {
+        Scope* sc2 = sc;
+        if (stc != sc.stc ||
+            linkage != sc.linkage ||
+            cppmangle != sc.cppmangle ||
+            !protection.isSubsetOf(sc.protection) ||
+            explicitProtection != sc.explicitProtection ||
+            aligndecl !is sc.aligndecl ||
+            inlining != sc.inlining)
+        {
+            // create new one for changes
+            sc2 = sc.copy();
+            sc2.stc = stc;
+            sc2.linkage = linkage;
+            sc2.cppmangle = cppmangle;
+            sc2.protection = protection;
+            sc2.explicitProtection = explicitProtection;
+            sc2.aligndecl = aligndecl;
+            sc2.inlining = inlining;
+        }
+        return sc2;
+    }
+
+    /****************************************
+     * A hook point to supply scope for members.
+     * addMember, setScope, importAll, semantic, semantic2 and semantic3 will use this.
+     */
+    void visit(AttribDeclaration ad)
+    {
+        *_scope = sc;
+    }
+///
+    void visit(StorageClassDeclaration scd)
+    {
+        StorageClass scstc = sc.stc;
+        /* These sets of storage classes are mutually exclusive,
+         * so choose the innermost or most recent one.
+         */
+        if (scd.stc & (STC.auto_ | STC.scope_ | STC.static_ | STC.extern_ | STC.manifest))
+            scstc &= ~(STC.auto_ | STC.scope_ | STC.static_ | STC.extern_ | STC.manifest);
+        if (scd.stc & (STC.auto_ | STC.scope_ | STC.static_ | STC.tls | STC.manifest | STC.gshared))
+            scstc &= ~(STC.auto_ | STC.scope_ | STC.static_ | STC.tls | STC.manifest | STC.gshared);
+        if (scd.stc & (STC.const_ | STC.immutable_ | STC.manifest))
+            scstc &= ~(STC.const_ | STC.immutable_ | STC.manifest);
+        if (scd.stc & (STC.gshared | STC.shared_ | STC.tls))
+            scstc &= ~(STC.gshared | STC.shared_ | STC.tls);
+        if (scd.stc & (STC.safe | STC.trusted | STC.system))
+            scstc &= ~(STC.safe | STC.trusted | STC.system);
+        scstc |= scd.stc;
+        //printf("scstc = x%llx\n", scstc);
+        *_scope = createNewScope(sc, scstc, sc.linkage, sc.cppmangle,
+            sc.protection, sc.explicitProtection, sc.aligndecl, sc.inlining);
+    }
+
+    /**
+     * Provides a new scope with `STC.deprecated_` and `Scope.depdecl` set
+     *
+     * Calls `StorageClassDeclaration.newScope` (as it must be called or copied
+     * in any function overriding `newScope`), then set the `Scope`'s depdecl.
+     *
+     */
+    void visit(DeprecatedDeclaration dd)
+    {
+        visit(cast(StorageClassDeclaration) dd);
+        // The enclosing scope is deprecated as well
+        if (*_scope == sc)
+            *_scope = sc.push();
+        (*_scope).depdecl = dd;
+    }
+///
+    void visit(LinkDeclaration ld)
+    {
+        *_scope = createNewScope(sc, sc.stc, ld.linkage, sc.cppmangle, sc.protection, sc.explicitProtection,
+            sc.aligndecl, sc.inlining);
+    }
+///
+    void visit(CPPMangleDeclaration cppmd, Scope* sc)
+    {
+        *_scope = createNewScope(sc, sc.stc, LINK.cpp, cppmd.cppmangle, sc.protection, sc.explicitProtection,
+            sc.aligndecl, sc.inlining);
+    }
+
+    /**
+     * Returns:
+     *   A copy of the parent scope, with `this` as `namespace` and C++ linkage
+     */
+    void visit(CPPNamespaceDeclaration cppnd)
+    {
+        auto scx = sc.copy();
+        scx.linkage = LINK.cpp;
+        scx.namespace = cppnd;
+        *_scope = scx;
+    }
+///
+    void visit(ProtDeclaration pd)
+    {
+        if (pd.pkg_identifiers)
+            dsymbolSemantic(pd, sc);
+        *_scope = createNewScope(sc, sc.stc, sc.linkage, sc.cppmangle, pd.protection, 1, sc.aligndecl, sc.inlining);
+    }
+///
+    void visit(AlignDeclaration ad)
+    {
+        *_scope = createNewScope(sc, sc.stc, sc.linkage, sc.cppmangle, sc.protection, sc.explicitProtection, ad, sc.inlining);
+    }
+///
+    void visit(PragmaDeclaration pd)
+    {
+        if (pd.ident == Id.Pinline)
+        {
+            PINLINE inlining = PINLINE.default_;
+            if (!pd.args || pd.args.dim == 0)
+                inlining = PINLINE.default_;
+            else if (pd.args.dim != 1)
+            {
+                pd.error("one boolean expression expected for `pragma(inline)`, not %llu", cast(ulong) pd.args.dim);
+                pd.args.setDim(1);
+                (*pd.args)[0] = ErrorExp.get();
+            }
+            else
+            {
+                Expression e = (*pd.args)[0];
+                if (e.op != TOK.int64 || !e.type.equals(Type.tbool))
+                {
+                    if (e.op != TOK.error)
+                    {
+                        pd.error("pragma(`inline`, `true` or `false`) expected, not `%s`", e.toChars());
+                        (*pd.args)[0] = ErrorExp.get();
+                    }
+                }
+                else if (e.isBool(true))
+                    inlining = PINLINE.always;
+                else if (e.isBool(false))
+                    inlining = PINLINE.never;
+            }
+            *_scope = createNewScope(sc, sc.stc, sc.linkage, sc.cppmangle, sc.protection, sc.explicitProtection, sc.aligndecl, inlining);
+        }
+        if (pd.ident == Id.printf || pd.ident == Id.scanf)
+        {
+            auto sc2 = sc.push();
+
+            if (pd.ident == Id.printf)
+                // Override previous setting, never let both be set
+                sc2.flags = (sc2.flags & ~SCOPE.scanf) | SCOPE.printf;
+            else
+                sc2.flags = (sc2.flags & ~SCOPE.printf) | SCOPE.scanf;
+
+            *_scope = sc2;
+        }
+        *_scope = sc;
+    }
+
+    /**************************************
+     * Use the ForwardingScopeDsymbol as the parent symbol for members.
+     */
+    void visit(ForwardingAttribDeclaration fad)
+    {
+        *_scope = sc.push(fad.sym);
+    }
+///
+    void visit(UserAttributeDeclaration uad)
+    {
+        Scope* sc2 = sc;
+        if (uad.atts && uad.atts.dim)
+        {
+            // create new one for changes
+            sc2 = sc.copy();
+            sc2.userAttribDecl = uad;
+        }
+        *_scope = sc2;
     }
 }
