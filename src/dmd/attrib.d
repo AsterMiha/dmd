@@ -31,7 +31,7 @@ import dmd.declaration;
 import dmd.dmodule;
 import dmd.dscope;
 import dmd.dsymbol;
-import dmd.dsymbolsem : dsymbolSemantic, ScopeVisitor;
+import dmd.dsymbolsem : dsymbolSemantic;
 import dmd.expression;
 import dmd.func;
 import dmd.globals;
