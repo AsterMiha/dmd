@@ -821,6 +821,7 @@ final class Parser(AST) : Lexer
                     goto Lautodecl;
                 }
             Lstc:
+                startloc = token.loc;
                 pAttrs.storageClass = appendStorageClass(pAttrs.storageClass, stc);
                 nextToken();
 
@@ -875,7 +876,7 @@ final class Parser(AST) : Lexer
                 auto stc2 = getStorageClass!AST(pAttrs);
                 if (stc2 != STC.undefined_)
                 {
-                    s = new AST.StorageClassDeclaration(stc2, a);
+                    s = new AST.StorageClassDeclaration(startloc, stc2, a);
                 }
                 if (pAttrs.udas)
                 {
@@ -4267,10 +4268,13 @@ final class Parser(AST) : Lexer
     }
 
     private void parseStorageClasses(ref StorageClass storage_class, ref LINK link,
-        ref bool setAlignment, ref AST.Expression ealign, ref AST.Expressions* udas)
+        ref bool setAlignment, ref AST.Expression ealign, ref AST.Expressions* udas,
+        ref Loc storageloc)
     {
         StorageClass stc;
         bool sawLinkage = false; // seen a linkage declaration
+
+        storageloc = Loc.initial;
 
         while (1)
         {
@@ -4372,6 +4376,8 @@ final class Parser(AST) : Lexer
                 }
             L1:
                 storage_class = appendStorageClass(storage_class, stc);
+                if (storageloc == Loc.initial)
+                    storageloc = token.loc;
                 nextToken();
                 continue;
 
@@ -4435,6 +4441,7 @@ final class Parser(AST) : Lexer
         bool setAlignment = false;
         AST.Expression ealign;
         AST.Expressions* udas = null;
+        Loc storageloc;
 
         //printf("parseDeclarations() %s\n", token.toChars());
         if (!comment)
@@ -4505,7 +4512,7 @@ final class Parser(AST) : Lexer
                         link = linkage;
                         setAlignment = false;
                         ealign = null;
-                        parseStorageClasses(storage_class, link, setAlignment, ealign, udas);
+                        parseStorageClasses(storage_class, link, setAlignment, ealign, udas, storageloc);
                     }
 
                     if (token.value == TOK.at)
@@ -4666,7 +4673,7 @@ final class Parser(AST) : Lexer
 
         if (!autodecl)
         {
-            parseStorageClasses(storage_class, link, setAlignment, ealign, udas);
+            parseStorageClasses(storage_class, link, setAlignment, ealign, udas, storageloc);
 
             if (token.value == TOK.enum_)
             {
@@ -4695,7 +4702,8 @@ final class Parser(AST) : Lexer
 
                 if (storage_class)
                 {
-                    s = new AST.StorageClassDeclaration(storage_class, a);
+                    // TODO: storageloc doesn't always work find something else
+                    s = new AST.StorageClassDeclaration(storageloc, storage_class, a);
                     a = new AST.Dsymbols();
                     a.push(s);
                 }
@@ -4904,7 +4912,7 @@ final class Parser(AST) : Lexer
                         f.storage_class &= ~STC.static_;
                         auto ax = new AST.Dsymbols();
                         ax.push(s);
-                        s = new AST.StorageClassDeclaration(STC.static_, ax);
+                        s = new AST.StorageClassDeclaration(storageloc, STC.static_, ax);
                     }
                 }
                 a.push(s);

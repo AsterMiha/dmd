@@ -1404,6 +1404,12 @@ struct ASTBase
             this.stc = stc;
         }
 
+        final extern (D) this(const ref Loc loc, StorageClass stc, Dsymbols* decl)
+        {
+            super(loc, null, decl);
+            this.stc = stc;
+        }
+
         override void accept(Visitor v)
         {
             v.visit(this);

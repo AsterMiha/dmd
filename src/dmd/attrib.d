@@ -231,10 +231,19 @@ extern (C++) class StorageClassDeclaration : AttribDeclaration
         this.stc = stc;
     }
 
+    extern (D) this(const ref Loc loc, StorageClass stc, Dsymbols* decl)
+    {
+        super(loc, null, decl);
+        import std.stdio : writeln;
+        writeln(decl.toString);
+        writeln(loc);
+        this.stc = stc;
+    }
+
     override Dsymbol syntaxCopy(Dsymbol s)
     {
         assert(!s);
-        return new StorageClassDeclaration(stc, Dsymbol.arraySyntaxCopy(decl));
+        return new StorageClassDeclaration(loc, stc, Dsymbol.arraySyntaxCopy(decl));
     }
 
     override Scope* newScope(Scope* sc)
