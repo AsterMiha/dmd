@@ -207,6 +207,7 @@ private struct PrefixAttributes(AST)
     bool setAlignment;
     AST.Expression ealign;
     AST.Expressions* udas;
+    Loc udaStart;
     const(char)* comment;
 }
 
@@ -288,6 +289,7 @@ final class Parser(AST) : Lexer
         Loc endloc; // set to location of last right curly
         int inBrackets; // inside [] of array index or slice
         Loc lookingForElse; // location of lonely if looking for an else
+        Loc udaStart;
     }
 
     /*********************
@@ -360,6 +362,7 @@ final class Parser(AST) : Lexer
                     }
                 case TOK.at:
                     {
+                        const Loc loc = token.loc;
                         AST.Expressions* exps = null;
                         const stc = parseAttribute(exps);
                         if (stc & atAttrGroup)
@@ -368,6 +371,8 @@ final class Parser(AST) : Lexer
                         }
                         else
                         {
+                            if (udas == null)
+                                udaStart = loc;
                             udas = AST.UserAttributeDeclaration.concat(udas, exps);
                         }
                         if (stc)
@@ -812,11 +817,16 @@ final class Parser(AST) : Lexer
 
             case TOK.at:
                 {
+                    const Loc loc = token.loc;
                     AST.Expressions* exps = null;
                     stc = parseAttribute(exps);
                     if (stc)
                         goto Lstc; // it's a predefined attribute
                     // no redundant/conflicting check for UDAs
+                    if (pAttrs.udas == null)
+                    {
+                        pAttrs.udaStart = loc;
+                    }
                     pAttrs.udas = AST.UserAttributeDeclaration.concat(pAttrs.udas, exps);
                     goto Lautodecl;
                 }
@@ -1525,10 +1535,13 @@ final class Parser(AST) : Lexer
 
             case TOK.at:
                 {
+                    const Loc loc = token.loc;
                     AST.Expressions* udas = null;
                     stc = parseAttribute(udas);
                     if (udas)
                     {
+                        if (*pudas == null)
+                            udaStart = loc;
                         if (pudas)
                             *pudas = AST.UserAttributeDeclaration.concat(*pudas, udas);
                         else
@@ -2914,6 +2927,7 @@ final class Parser(AST) : Lexer
                     goto L2;
                 case TOK.at:
                     {
+                        const Loc loc = token.loc;
                         AST.Expressions* exps = null;
                         StorageClass stc2 = parseAttribute(exps);
                         if (stc2 & atAttrGroup)
@@ -2922,6 +2936,8 @@ final class Parser(AST) : Lexer
                         }
                         else
                         {
+                            if (udas == null)
+                                udaStart = loc;
                             udas = AST.UserAttributeDeclaration.concat(udas, exps);
                         }
                         if (token.value == TOK.dotDotDot)
@@ -3275,7 +3291,7 @@ final class Parser(AST) : Lexer
                 {
                     auto s = new AST.Dsymbols();
                     s.push(em);
-                    auto uad = new AST.UserAttributeDeclaration(udas, s);
+                    auto uad = new AST.UserAttributeDeclaration(loc, udas, s);
                     em.userAttribDecl = uad;
                 }
 

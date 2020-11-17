@@ -1366,11 +1366,18 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
         this.atts = atts;
     }
 
+    extern (D) this(const ref Loc loc, Expressions* atts, Dsymbols* decl)
+    {
+        super(loc, null, decl);
+        //printf("UserAttributeDeclaration()\n");
+        this.atts = atts;
+    }
+
     override Dsymbol syntaxCopy(Dsymbol s)
     {
         //printf("UserAttributeDeclaration::syntaxCopy('%s')\n", toChars());
         assert(!s);
-        return new UserAttributeDeclaration(Expression.arraySyntaxCopy(this.atts), Dsymbol.arraySyntaxCopy(decl));
+        return new UserAttributeDeclaration(this.loc, Expression.arraySyntaxCopy(this.atts), Dsymbol.arraySyntaxCopy(decl));
     }
 
     override Scope* newScope(Scope* sc)
