@@ -392,7 +392,7 @@ final class Parser(AST) : Lexer
         if (udas)
         {
             auto a = new AST.Dsymbols();
-            auto udad = new AST.UserAttributeDeclaration(udas, a);
+            auto udad = new AST.UserAttributeDeclaration(udaStart, udas, a);
             mod.userAttribDecl = udad;
         }
 
@@ -824,9 +824,8 @@ final class Parser(AST) : Lexer
                         goto Lstc; // it's a predefined attribute
                     // no redundant/conflicting check for UDAs
                     if (pAttrs.udas == null)
-                    {
                         pAttrs.udaStart = loc;
-                    }
+
                     pAttrs.udas = AST.UserAttributeDeclaration.concat(pAttrs.udas, exps);
                     goto Lautodecl;
                 }
@@ -847,7 +846,7 @@ final class Parser(AST) : Lexer
                         *pLastDecl = (*a)[a.dim - 1];
                     if (pAttrs.udas)
                     {
-                        s = new AST.UserAttributeDeclaration(pAttrs.udas, a);
+                        s = new AST.UserAttributeDeclaration(pAttrs.udaStart, pAttrs.udas, a);
                         pAttrs.udas = null;
                     }
                     break;
@@ -875,7 +874,7 @@ final class Parser(AST) : Lexer
                         *pLastDecl = (*a)[a.dim - 1];
                     if (pAttrs.udas)
                     {
-                        s = new AST.UserAttributeDeclaration(pAttrs.udas, a);
+                        s = new AST.UserAttributeDeclaration(pAttrs.udaStart, pAttrs.udas, a);
                         pAttrs.udas = null;
                     }
                     break;
@@ -1456,6 +1455,8 @@ final class Parser(AST) : Lexer
      */
     private StorageClass parseAttribute(ref AST.Expressions* udas)
     {
+        const atLoc = token.loc;
+
         nextToken();
         if (token.value == TOK.identifier)
         {
@@ -1473,7 +1474,10 @@ final class Parser(AST) : Lexer
             }
 
             if (udas is null)
+            {
+                udaStart = atLoc;
                 udas = new AST.Expressions();
+            }
             udas.push(exp);
             return 0;
         }
@@ -1483,6 +1487,8 @@ final class Parser(AST) : Lexer
             // Multi-UDAs ( `@( ArgumentList )`) form, concatenate with existing
             if (peekNext() == TOK.rightParentheses)
                 error("empty attribute list is not allowed");
+            if (udas is null)
+                udaStart = atLoc;
             udas = AST.UserAttributeDeclaration.concat(udas, parseArguments());
             return 0;
         }
@@ -4588,7 +4594,7 @@ final class Parser(AST) : Lexer
                             auto tf = cast(AST.TypeFunction) fd.type;
                             assert(tf.parameterList.parameters.dim > 0);
                             auto as = new AST.Dsymbols();
-                            (*tf.parameterList.parameters)[0].userAttribDecl = new AST.UserAttributeDeclaration(udas, as);
+                            (*tf.parameterList.parameters)[0].userAttribDecl = new AST.UserAttributeDeclaration(udaStart, udas, as);
                         }
 
                         v = new AST.AliasDeclaration(loc, ident, s);
@@ -4692,7 +4698,7 @@ final class Parser(AST) : Lexer
 
                 if (udas)
                 {
-                    d = new AST.UserAttributeDeclaration(udas, a);
+                    d = new AST.UserAttributeDeclaration(udaStart, udas, a);
                     a = new AST.Dsymbols();
                     a.push(d);
                 }
@@ -4729,7 +4735,7 @@ final class Parser(AST) : Lexer
                 }
                 if (udas)
                 {
-                    s = new AST.UserAttributeDeclaration(udas, a);
+                    s = new AST.UserAttributeDeclaration(udaStart, udas, a);
                     a = new AST.Dsymbols();
                     a.push(s);
                 }
@@ -4747,7 +4753,7 @@ final class Parser(AST) : Lexer
                 AST.Dsymbols* a = parseAutoDeclarations(storage_class, comment);
                 if (udas)
                 {
-                    AST.Dsymbol s = new AST.UserAttributeDeclaration(udas, a);
+                    AST.Dsymbol s = new AST.UserAttributeDeclaration(udaStart, udas, a);
                     a = new AST.Dsymbols();
                     a.push(s);
                 }
@@ -4901,7 +4907,7 @@ final class Parser(AST) : Lexer
                 {
                     auto ax = new AST.Dsymbols();
                     ax.push(s);
-                    s = new AST.UserAttributeDeclaration(udas, ax);
+                    s = new AST.UserAttributeDeclaration(udaStart, udas, ax);
                 }
 
                 /* A template parameter list means it's a function template
@@ -4965,7 +4971,7 @@ final class Parser(AST) : Lexer
                 {
                     auto ax = new AST.Dsymbols();
                     ax.push(s);
-                    s = new AST.UserAttributeDeclaration(udas, ax);
+                    s = new AST.UserAttributeDeclaration(udaStart, udas, ax);
                 }
                 a.push(s);
                 switch (token.value)
