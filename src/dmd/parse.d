@@ -206,7 +206,7 @@ private struct PrefixAttributes(AST)
     AST.Prot protection;
     bool setAlignment;
     AST.Expression ealign;
-    AST.Expressions* udas;
+    AST.UserAttributeDeclarationItems* udas;
     const(char)* comment;
 }
 
@@ -332,7 +332,7 @@ final class Parser(AST) : Lexer
         const comment = token.blockComment;
         bool isdeprecated = false;
         AST.Expression msg = null;
-        AST.Expressions* udas = null;
+        AST.UserAttributeDeclarationItems* udas = null;
         AST.Dsymbols* decldefs;
         AST.Dsymbol lastDecl = mod; // for attaching ddoc unittests to module decl
 
@@ -360,7 +360,7 @@ final class Parser(AST) : Lexer
                     }
                 case TOK.at:
                     {
-                        AST.Expressions* exps = null;
+                        AST.UserAttributeDeclarationItems* exps = null;
                         const stc = parseAttribute(exps);
                         if (stc & atAttrGroup)
                         {
@@ -812,7 +812,7 @@ final class Parser(AST) : Lexer
 
             case TOK.at:
                 {
-                    AST.Expressions* exps = null;
+                    AST.UserAttributeDeclarationItems* exps = null;
                     stc = parseAttribute(exps);
                     if (stc)
                         goto Lstc; // it's a predefined attribute
@@ -908,7 +908,10 @@ final class Parser(AST) : Lexer
                     AST.Expressions* exps = parseArguments();
                     // no redundant/conflicting check for UDAs
 
-                    pAttrs.udas = AST.UserAttributeDeclaration.concat(pAttrs.udas, exps);
+                    auto u = new AST.UserAttributeDeclarationItem(token.loc, exps);
+                    auto arr = new AST.UserAttributeDeclarationItems;
+                    arr.push(u);
+                    pAttrs.udas = AST.UserAttributeDeclaration.concat(pAttrs.udas, arr);
                     a = parseBlock(pLastDecl, pAttrs);
                     if (pAttrs.udas)
                     {
@@ -1444,8 +1447,10 @@ final class Parser(AST) : Lexer
      *   If the attribute is builtin, the return value will be non-zero.
      *   Otherwise, 0 is returned, and `pudas` will be appended to.
      */
-    private StorageClass parseAttribute(ref AST.Expressions* udas)
+    private StorageClass parseAttribute(ref AST.UserAttributeDeclarationItems* udas)
     {
+        Loc atloc = token.loc;
+
         nextToken();
         if (token.value == TOK.identifier)
         {
@@ -1463,8 +1468,8 @@ final class Parser(AST) : Lexer
             }
 
             if (udas is null)
-                udas = new AST.Expressions();
-            udas.push(exp);
+                udas = new AST.UserAttributeDeclarationItems();
+            udas.push(new AST.UserAttributeDeclarationItem(atloc, exp));
             return 0;
         }
 
@@ -1473,7 +1478,11 @@ final class Parser(AST) : Lexer
             // Multi-UDAs ( `@( ArgumentList )`) form, concatenate with existing
             if (peekNext() == TOK.rightParentheses)
                 error("empty attribute list is not allowed");
-            udas = AST.UserAttributeDeclaration.concat(udas, parseArguments());
+            AST.Expressions* exps = parseArguments();
+            auto item = new AST.UserAttributeDeclarationItem(atloc, exps);
+            auto arr = new AST.UserAttributeDeclarationItems;
+            arr.push(item);
+            udas = AST.UserAttributeDeclaration.concat(udas, arr);
             return 0;
         }
 
@@ -1484,7 +1493,7 @@ final class Parser(AST) : Lexer
     /***********************************************
      * Parse const/immutable/shared/inout/nothrow/pure postfix
      */
-    private StorageClass parsePostfix(StorageClass storageClass, AST.Expressions** pudas)
+    private StorageClass parsePostfix(StorageClass storageClass, AST.UserAttributeDeclarationItems** pudas)
     {
         while (1)
         {
@@ -1525,7 +1534,7 @@ final class Parser(AST) : Lexer
 
             case TOK.at:
                 {
-                    AST.Expressions* udas = null;
+                    AST.UserAttributeDeclarationItems* udas = null;
                     stc = parseAttribute(udas);
                     if (udas)
                     {
@@ -2465,7 +2474,7 @@ final class Parser(AST) : Lexer
      */
     private AST.Dsymbol parseCtor(PrefixAttributes!AST* pAttrs)
     {
-        AST.Expressions* udas = null;
+        AST.UserAttributeDeclarationItems* udas = null;
         const loc = token.loc;
         StorageClass stc = getStorageClass!AST(pAttrs);
 
@@ -2558,7 +2567,7 @@ final class Parser(AST) : Lexer
      */
     private AST.Dsymbol parseDtor(PrefixAttributes!AST* pAttrs)
     {
-        AST.Expressions* udas = null;
+        AST.UserAttributeDeclarationItems* udas = null;
         const loc = token.loc;
         StorageClass stc = getStorageClass!AST(pAttrs);
 
@@ -2628,7 +2637,7 @@ final class Parser(AST) : Lexer
      */
     private AST.Dsymbol parseStaticDtor(PrefixAttributes!AST* pAttrs)
     {
-        AST.Expressions* udas = null;
+        AST.UserAttributeDeclarationItems* udas = null;
         const loc = token.loc;
         StorageClass stc = getStorageClass!AST(pAttrs);
 
@@ -2702,7 +2711,7 @@ final class Parser(AST) : Lexer
      */
     private AST.Dsymbol parseSharedStaticDtor(PrefixAttributes!AST* pAttrs)
     {
-        AST.Expressions* udas = null;
+        AST.UserAttributeDeclarationItems* udas = null;
         const loc = token.loc;
         StorageClass stc = getStorageClass!AST(pAttrs);
 
@@ -2860,7 +2869,7 @@ final class Parser(AST) : Lexer
             StorageClass storageClass = 0;
             StorageClass stc;
             AST.Expression ae;
-            AST.Expressions* udas = null;
+            AST.UserAttributeDeclarationItems* udas = null;
             for (; 1; nextToken())
             {
             L3:
@@ -2909,7 +2918,7 @@ final class Parser(AST) : Lexer
                     goto L2;
                 case TOK.at:
                     {
-                        AST.Expressions* exps = null;
+                        AST.UserAttributeDeclarationItems* exps = null;
                         StorageClass stc2 = parseAttribute(exps);
                         if (stc2 & atAttrGroup)
                         {
@@ -3051,7 +3060,7 @@ final class Parser(AST) : Lexer
                         }
                         if (token.value == TOK.at)
                         {
-                            AST.Expressions* exps = null;
+                            AST.UserAttributeDeclarationItems* exps = null;
                             StorageClass stc2 = parseAttribute(exps);
                             if (stc2 & atAttrGroup)
                             {
@@ -3152,7 +3161,7 @@ final class Parser(AST) : Lexer
                 AST.Type type = null;
                 Identifier ident = null;
 
-                AST.Expressions* udas;
+                AST.UserAttributeDeclarationItems* udas;
                 StorageClass stc;
                 AST.Expression deprecationMessage;
                 enum attributeErrorMessage = "`%s` is not a valid attribute for enum members";
@@ -4097,7 +4106,7 @@ final class Parser(AST) : Lexer
      */
     private AST.Type parseDeclarator(AST.Type t, ref int palt, out Identifier pident,
         AST.TemplateParameters** tpl = null, StorageClass storageClass = 0,
-        bool* pdisable = null, AST.Expressions** pudas = null)
+        bool* pdisable = null, AST.UserAttributeDeclarationItems** pudas = null)
     {
         //printf("parseDeclarator(tpl = %p)\n", tpl);
         t = parseTypeSuffixes(t);
@@ -4262,7 +4271,7 @@ final class Parser(AST) : Lexer
     }
 
     private void parseStorageClasses(ref StorageClass storage_class, ref LINK link,
-        ref bool setAlignment, ref AST.Expression ealign, ref AST.Expressions* udas)
+        ref bool setAlignment, ref AST.Expression ealign, ref AST.UserAttributeDeclarationItems* udas)
     {
         StorageClass stc;
         bool sawLinkage = false; // seen a linkage declaration
@@ -4429,7 +4438,7 @@ final class Parser(AST) : Lexer
         LINK link = linkage;
         bool setAlignment = false;
         AST.Expression ealign;
-        AST.Expressions* udas = null;
+        AST.UserAttributeDeclarationItems* udas = null;
 
         //printf("parseDeclarations() %s\n", token.toChars());
         if (!comment)

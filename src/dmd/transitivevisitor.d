@@ -576,7 +576,13 @@ package mixin template ParseVisitMethods(AST)
     override void visit(AST.UserAttributeDeclaration d)
     {
         //printf("Visiting UserAttributeDeclaration\n");
-        visitArgs(d.atts);
+        if (d.atts)
+        {
+            foreach (el; *(d.atts))
+            {
+                el.accept(this);
+            }
+        }
         visitAttribDeclaration(cast(AST.AttribDeclaration)d);
     }
 

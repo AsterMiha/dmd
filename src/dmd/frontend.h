@@ -2155,6 +2155,21 @@ public:
     void accept(Visitor* v);
 };
 
+typedef Array<class UserAttributeDeclarationItem *> UserAttributeDeclarationItems;
+
+class UserAttributeDeclarationItem : public ASTNode
+{
+public:
+    Expression e;
+    Loc loc;
+
+    static UserAttributeDeclarationItems *arraySyntaxCopy(UserAttributeDeclarationItems *a);
+    static Expressions *convertToExpressions(UserAttributeDeclarationItems *a);
+    void accept(Visitor *v) { v->visit(e); };
+};
+
+bool arrayUADSemantic(UserAttributeDeclarationItems *exps, Scope *sc, bool preserveErrors = false);
+
 class UserAttributeDeclaration final : public AttribDeclaration
 {
 public:

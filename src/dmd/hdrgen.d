@@ -102,7 +102,8 @@ void moduleToBuffer2(Module m, OutBuffer* buf, HdrGenState* hgs)
         if (m.userAttribDecl)
         {
             buf.writestring("@(");
-            argsToBuffer(m.userAttribDecl.atts, buf, hgs);
+            auto exps = UserAttributeDeclarationItem.convertToExpressions(m.userAttribDecl.atts);
+            argsToBuffer(exps, buf, hgs);
             buf.writeByte(')');
             buf.writenl();
         }
@@ -1128,7 +1129,8 @@ public:
     override void visit(UserAttributeDeclaration d)
     {
         buf.writestring("@(");
-        argsToBuffer(d.atts, buf, hgs);
+        auto exps = UserAttributeDeclarationItem.convertToExpressions(d.atts);
+        argsToBuffer(exps, buf, hgs);
         buf.writeByte(')');
         visit(cast(AttribDeclaration)d);
     }
@@ -3065,7 +3067,8 @@ private void parameterToBuffer(Parameter p, OutBuffer* buf, HdrGenState* hgs)
         if (isAnonymous)
             buf.writeByte('(');
 
-        argsToBuffer(p.userAttribDecl.atts, buf, hgs);
+        auto exps = UserAttributeDeclarationItem.convertToExpressions(p.userAttribDecl.atts);
+        argsToBuffer(exps, buf, hgs);
 
         if (isAnonymous)
             buf.writeByte(')');

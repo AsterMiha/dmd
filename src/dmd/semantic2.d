@@ -569,7 +569,12 @@ private extern(C++) final class Semantic2Visitor : Visitor
             }
 
             uad._scope = null;
-            eval(sc, uad.atts, lastTag);
+            auto exps = UserAttributeDeclarationItem.convertToExpressions(uad.atts);
+            eval(sc, exps, lastTag);
+            for (size_t i=0; i<uad.atts.dim; i++)
+            {
+                (*(uad.atts))[i].e = (*exps)[i];
+            }
         }
         visit(cast(AttribDeclaration)uad);
     }

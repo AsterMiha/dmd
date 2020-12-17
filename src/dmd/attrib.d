@@ -24,6 +24,7 @@
 
 module dmd.attrib;
 
+import dmd.ast_node;
 import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.cond;
@@ -42,6 +43,7 @@ import dmd.identifier;
 import dmd.mtype;
 import dmd.objc; // for objc.addSymbols
 import dmd.root.outbuffer;
+import dmd.root.array;
 import dmd.target; // for target.systemLinkage
 import dmd.tokens;
 import dmd.visitor;
@@ -1350,6 +1352,92 @@ extern (C++) final class CompileDeclaration : AttribDeclaration
     }
 }
 
+alias UserAttributeDeclarationItems = Array!(UserAttributeDeclarationItem);
+
+extern (C++) class UserAttributeDeclarationItem : ASTNode
+{
+    Loc loc;
+    Expression e;
+
+    extern (D) this(const ref Loc loc, Expression e)
+    {
+        this.loc = loc;
+        this.e = e;
+    }
+
+    extern (D) this(const ref Loc loc, Expressions* e)
+    {
+        this.loc = loc;
+        this.e = new TupleExp(Loc.initial, e);
+    }
+
+    /*************************************
+     * Do syntax copy of an array of UserAttributeDeclarationItem's.
+     */
+    static UserAttributeDeclarationItems* arraySyntaxCopy(UserAttributeDeclarationItems* a)
+    {
+        UserAttributeDeclarationItems* b = null;
+        if (a)
+        {
+            b = a.copy();
+            for (size_t i = 0; i < b.dim; i++)
+            {
+                (*b)[i] = (*b)[i].syntaxCopy(null);
+            }
+        }
+        return b;
+    }
+    
+    static Expressions* convertToExpressions(UserAttributeDeclarationItems* a) 
+    {
+        Expressions* b = null;
+        if (a)
+        {
+            b = new Expressions(a.dim);
+            for (size_t i = 0; i < b.dim; i++)
+            {
+                (*b)[i] = (*a)[i].e;
+            }
+        }
+        return b;
+    }
+
+    UserAttributeDeclarationItem syntaxCopy(Dsymbol s)
+    {
+        return new UserAttributeDeclarationItem(loc, e.syntaxCopy);
+    }
+
+    override void accept(Visitor v)
+    {
+        v.visit(this);
+    }
+
+    alias e this;
+}
+
+/******************************
+ * Perform semantic() on an array of UserAttributeDeclarationItems.
+ */
+bool arrayUADSemantic(UserAttributeDeclarationItems* exps, Scope* sc, bool preserveErrors = false)
+{
+    bool err = false;
+    if (exps)
+    {
+        foreach (ref e; *exps)
+        {
+            if (e.e)
+            {
+                auto e2 = e.e.expressionSemantic(sc);
+                if (e2.op == TOK.error)
+                    err = true;
+                if (preserveErrors || e2.op != TOK.error)
+                    e.e = e2;
+            }
+        }
+    }
+    return err;
+}
+
 /***********************************************************
  * User defined attributes look like:
  *      @foo(args, ...)
@@ -1357,9 +1445,9 @@ extern (C++) final class CompileDeclaration : AttribDeclaration
  */
 extern (C++) final class UserAttributeDeclaration : AttribDeclaration
 {
-    Expressions* atts;
+    UserAttributeDeclarationItems* atts;
 
-    extern (D) this(Expressions* atts, Dsymbols* decl)
+    extern (D) this(UserAttributeDeclarationItems* atts, Dsymbols* decl)
     {
         super(decl);
         this.atts = atts;
@@ -1369,7 +1457,7 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
     {
         //printf("UserAttributeDeclaration::syntaxCopy('%s')\n", toChars());
         assert(!s);
-        return new UserAttributeDeclaration(Expression.arraySyntaxCopy(this.atts), Dsymbol.arraySyntaxCopy(decl));
+        return new UserAttributeDeclaration(UserAttributeDeclarationItem.arraySyntaxCopy(this.atts), Dsymbol.arraySyntaxCopy(decl));
     }
 
     override Scope* newScope(Scope* sc)
@@ -1392,11 +1480,14 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
         return AttribDeclaration.setScope(sc);
     }
 
-    extern (D) static Expressions* concat(Expressions* udas1, Expressions* udas2)
+    extern (D) static UserAttributeDeclarationItems* concat(UserAttributeDeclarationItems* udas1,
+        UserAttributeDeclarationItems* udas2)
     {
-        Expressions* udas;
+        UserAttributeDeclarationItems* udas;
         if (!udas1 || udas1.dim == 0)
+        {
             udas = udas2;
+        }
         else if (!udas2 || udas2.dim == 0)
             udas = udas1;
         else
@@ -1404,9 +1495,8 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
             /* Create a new tuple that combines them
              * (do not append to left operand, as this is a copy-on-write operation)
              */
-            udas = new Expressions(2);
-            (*udas)[0] = new TupleExp(Loc.initial, udas1);
-            (*udas)[1] = new TupleExp(Loc.initial, udas2);
+            udas = udas1.copy;
+            udas.append(udas2);
         }
         return udas;
     }
@@ -1416,13 +1506,14 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
         if (auto sc = _scope)
         {
             _scope = null;
-            arrayExpressionSemantic(atts, sc);
+            arrayUADSemantic(atts, sc);
         }
         auto exps = new Expressions();
         if (userAttribDecl && userAttribDecl !is this)
             exps.push(new TupleExp(Loc.initial, userAttribDecl.getAttributes()));
         if (atts && atts.dim)
-            exps.push(new TupleExp(Loc.initial, atts));
+            exps.push(new TupleExp(Loc.initial,
+                UserAttributeDeclarationItem.convertToExpressions(atts)));
         return exps;
     }
 
